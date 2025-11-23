@@ -1,9 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 
 const getClient = () => {
-  // В Vite переменные окружения доступны через import.meta.env
-  // Мы также оставляем безопасную проверку process.env на всякий случай
-  const apiKey = import.meta.env.VITE_API_KEY || (typeof process !== 'undefined' ? process.env?.API_KEY : undefined);
+  // Use import.meta.env for Vite. 
+  // We removed process.env to prevent TypeScript errors during build since @types/node is not installed.
+  const apiKey = import.meta.env.VITE_API_KEY;
   
   if (!apiKey) {
     console.warn("Gemini API Key is missing. AI features will be disabled.");
