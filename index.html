@@ -7,6 +7,11 @@
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="OtkazAlco">
+    
+    <!-- iOS Home Screen Icon -->
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3076/3076134.png">
+    
     <title>OtkazAlcoFree</title>
     
     <!-- Telegram WebApp Script -->
@@ -40,6 +45,8 @@
               'blob': 'blob 7s infinite',
               'fade-in': 'fadeIn 0.5s ease-out',
               'pop': 'pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              'shimmer': 'shimmer 2s infinite',
+              'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
             },
             keyframes: {
               blob: {
@@ -56,6 +63,14 @@
                 '0%': { transform: 'scale(0.95)' },
                 '50%': { transform: 'scale(1.02)' },
                 '100%': { transform: 'scale(1)' },
+              },
+              shimmer: {
+                '0%': { transform: 'translateX(-100%)' },
+                '100%': { transform: 'translateX(100%)' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(100%)' },
+                '100%': { transform: 'translateY(0)' },
               }
             }
           }
@@ -139,6 +154,17 @@
         -webkit-tap-highlight-color: transparent;
         /* Prevent bounce scroll on body to make it feel like an app */
         overscroll-behavior-y: none;
+      }
+
+      /* Safe area adjustments for PWA */
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      .pb-safe-bottom {
+        padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
+      }
+      .pt-safe {
+        padding-top: env(safe-area-inset-top);
       }
 
       .glass-card {
