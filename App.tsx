@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Moon, Sun, X, Loader2, Info, ChevronRight, ShieldAlert, CheckCircle2, Plus, PlusCircle, Wind, Home, Calendar as CalendarIcon, Zap, Cloud } from 'lucide-react';
+import { Moon, Sun, X, Loader2, Info, ChevronRight, ShieldAlert, CheckCircle2, Plus, PlusCircle, Wind, Home, Calendar as CalendarIcon, Zap, Cloud, Share, PlusSquare } from 'lucide-react';
 import { Card } from './components/Card';
 import { TRIGGERS } from './constants';
 import { getSOSAdvice } from './services/geminiService';
@@ -46,12 +46,17 @@ const App: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showBreathing, setShowBreathing] = useState(false);
+  
+  // PWA State
+  const [showPwaInstall, setShowPwaInstall] = useState(false);
 
   // --- Initialization ---
   useEffect(() => {
     const initApp = async () => {
-      // 1. Setup Telegram
-      if (window.Telegram?.WebApp) {
+      // 1. Setup Telegram or Browser Mode
+      const isTelegram = !!window.Telegram?.WebApp?.initData;
+      
+      if (isTelegram) {
         window.Telegram.WebApp.ready();
         try {
           // Check if expand is supported (v6.1+)
@@ -65,6 +70,21 @@ const App: React.FC = () => {
         if (window.Telegram.WebApp.colorScheme === 'dark') {
           setIsDarkMode(true);
         }
+      } else {
+        // We are in a browser
+        // Check if iOS
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+        // Check if Standalone (PWA)
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+        
+        if (isIOS && !isStandalone) {
+             setShowPwaInstall(true);
+        }
+        
+        // Default to dark mode if system prefers it
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            setIsDarkMode(true);
+        }
       }
 
       // 2. Fetch Data (Cloud Sync)
@@ -76,21 +96,14 @@ const App: React.FC = () => {
         
         setUserSettings(settings);
         
-        // Priority: 
-        // 1. Last Relapse Date + 1 (Automatic)
-        // 2. Saved Start Date (Manual Setting)
-        // 3. Today (Default)
-        
         const sortedReports = [...reports].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         const lastRelapse = sortedReports.find(r => r.didDrink);
         
         if (lastRelapse) {
-            // If there is a relapse recorded, the sobriety starts the day AFTER the relapse
             const relapseDate = new Date(lastRelapse.date);
             relapseDate.setDate(relapseDate.getDate() + 1);
             setStartDate(relapseDate.toISOString().split('T')[0]);
         } else {
-            // No relapses found? Use the saved start date
             setStartDate(settings.startDate);
         }
 
@@ -225,17 +238,14 @@ const App: React.FC = () => {
         alcoholAmount: status === 'relapse' ? alcoholAmount : undefined
     };
     
-    // Async save to Cloud
     await saveReport(reportData);
 
-    // Update local state if relapse occurred to reset counter visually immediately
     if (status === 'relapse') {
         const nextDay = new Date();
         nextDay.setDate(nextDay.getDate() + 1);
         const nextDayStr = nextDay.toISOString().split('T')[0];
         
         setStartDate(nextDayStr);
-        // Also update settings to reflect this new reality
         if (userSettings) {
             const newSettings = { ...userSettings, startDate: nextDayStr };
             setUserSettings(newSettings);
@@ -246,7 +256,6 @@ const App: React.FC = () => {
     setIsSubmitting(false);
     triggerSuccessHaptic();
 
-    // Reset Form
     setCraving(0);
     setSelectedTriggers([]);
     setCustomTriggers([]);
@@ -619,13 +628,38 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen pb-safe relative font-sans transition-colors duration-300">
       
+      {showPwaInstall && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-blue-600 text-white p-4 animate-slide-up shadow-xl flex items-start gap-4 pb-safe pt-safe">
+            <div className="bg-white/20 p-2 rounded-xl">
+                <Share className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+                <h3 className="font-bold text-sm mb-1">Установи приложение</h3>
+                <p className="text-xs text-blue-100 mb-2 leading-relaxed">
+                    Нажми кнопку <span className="font-bold">Поделиться</span> внизу браузера, а затем выбери <span className="font-bold flex items-center gap-1 inline-flex bg-white/10 px-1 rounded">
+                        <PlusSquare className="w-3 h-3" /> На экран «Домой»
+                    </span>
+                </p>
+                <button 
+                  onClick={() => setShowPwaInstall(false)}
+                  className="text-[10px] font-bold uppercase tracking-wide bg-white text-blue-600 px-3 py-1.5 rounded-lg"
+                >
+                    Понятно, скрыть
+                </button>
+            </div>
+            <button onClick={() => setShowPwaInstall(false)} className="text-white/50">
+                <X className="w-5 h-5" />
+            </button>
+        </div>
+      )}
+
       <div className="fixed inset-0 -z-10 overflow-hidden">
         <div className={`absolute top-0 left-[-20%] w-[500px] h-[500px] bg-blue-400/20 dark:bg-blue-900/20 rounded-full mix-blend-multiply dark:mix-blend-lighten filter blur-[80px] animate-blob`}></div>
         <div className={`absolute top-0 right-[-20%] w-[500px] h-[500px] bg-purple-400/20 dark:bg-purple-900/20 rounded-full mix-blend-multiply dark:mix-blend-lighten filter blur-[80px] animate-blob animation-delay-2000`}></div>
         <div className={`absolute bottom-[-20%] left-[20%] w-[500px] h-[500px] bg-pink-400/20 dark:bg-pink-900/20 rounded-full mix-blend-multiply dark:mix-blend-lighten filter blur-[80px] animate-blob animation-delay-4000`}></div>
       </div>
 
-      <header className="sticky top-0 z-20 pt-2 pb-2">
+      <header className="sticky top-0 z-20 pt-2 pb-2 pt-safe">
         <div className="px-5 h-14 flex justify-between items-center max-w-md mx-auto bg-white/70 dark:bg-[#1C1C1E]/70 backdrop-blur-md rounded-full shadow-sm border border-white/40 dark:border-white/5 mx-4 mt-2">
             <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center shadow-md">
@@ -680,7 +714,7 @@ const App: React.FC = () => {
       )}
 
       {sosMessage && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none pb-safe">
           <div 
              className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm pointer-events-auto transition-opacity animate-fade-in"
              onClick={() => setSosMessage(null)}
