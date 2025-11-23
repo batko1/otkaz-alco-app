@@ -93,7 +93,14 @@ export const saveReport = async (report: DailyReport): Promise<DailyReport[]> =>
   localStorage.setItem(STORAGE_KEY, jsonStr);
 
   // 4. Save to CloudStorage (Async backup, silent fail allowed)
-  await cloudStorage.setItem(STORAGE_KEY, jsonStr);
+  // Note: CloudStorage has a 4096 char limit per key. 
+  // For a production app with years of data, you would need to split keys or use an external DB.
+  // For this MVP, we save what we can.
+  if (jsonStr.length < 4096) {
+      await cloudStorage.setItem(STORAGE_KEY, jsonStr);
+  } else {
+      console.warn("Data exceeds CloudStorage limit. Saving only to LocalStorage.");
+  }
   
   return reports;
 };
@@ -120,8 +127,10 @@ export const getReports = async (): Promise<DailyReport[]> => {
 
   // If local has data but cloud is empty (first sync or cloud unsupported), try to push to cloud
   if (localData.length > 0 && cloudData.length === 0) {
-      // Fire and forget
-      cloudStorage.setItem(STORAGE_KEY, JSON.stringify(localData));
+      const jsonStr = JSON.stringify(localData);
+      if (jsonStr.length < 4096) {
+        cloudStorage.setItem(STORAGE_KEY, jsonStr);
+      }
   }
 
   return localData.length > 0 ? localData : cloudData;
@@ -136,17 +145,39 @@ export const saveSettings = async (settings: UserSettings) => {
 };
 
 export const getSettings = async (): Promise<UserSettings> => {
+  const today = new Date().toISOString().split('T')[0];
+  const defaultSettings: UserSettings = { 
+      costPerDay: 500, 
+      currency: '₽',
+      startDate: today // Default to today if new user
+  };
+
   const localStr = localStorage.getItem(SETTINGS_KEY);
   const cloudStr = await cloudStorage.getItem(SETTINGS_KEY);
   
   // Cloud wins for settings if available, to sync preferences across devices
   if (cloudStr) {
-    const cloudSettings = JSON.parse(cloudStr);
-    localStorage.setItem(SETTINGS_KEY, cloudStr); // Sync back to local
-    return cloudSettings;
+    try {
+        const cloudSettings = JSON.parse(cloudStr);
+        // Merge with default to ensure new fields (like startDate) exist if old data format
+        const merged = { ...defaultSettings, ...cloudSettings };
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged)); 
+        return merged;
+    } catch (e) {
+        console.error("Error parsing cloud settings", e);
+    }
   }
   
-  return localStr ? JSON.parse(localStr) : { costPerDay: 500, currency: '₽' };
+  if (localStr) {
+      try {
+        const localSettings = JSON.parse(localStr);
+        return { ...defaultSettings, ...localSettings };
+      } catch (e) {
+          console.error("Error parsing local settings", e);
+      }
+  }
+
+  return defaultSettings;
 };
 
 // --- Stats Helpers (Synchronous for UI derivation) ---
