@@ -3,8 +3,8 @@ import { Moon, Sun, X, Loader2, Info, ChevronRight, ShieldAlert, CheckCircle2, P
 import { Card } from './components/Card';
 import { TRIGGERS } from './constants';
 import { getSOSAdvice } from './services/geminiService';
-import { saveReport, getReports } from './services/storage';
-import { DailyReport } from './services/types';
+import { saveReport, getReports, getSettings, saveSettings } from './services/storage';
+import { DailyReport, UserSettings } from './services/types';
 import { HistoryView } from './components/HistoryView';
 import { MotivationView } from './components/MotivationView';
 import { BreathingModal } from './components/BreathingModal';
@@ -24,8 +24,9 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   // Data State
-  const [startDate, setStartDate] = useState<string>('2025-11-10');
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [daysSober, setDaysSober] = useState(0);
+  const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
 
   // Form State
   const [status, setStatus] = useState<'sober' | 'relapse'>('sober');
@@ -68,9 +69,18 @@ const App: React.FC = () => {
 
       // 2. Fetch Data (Cloud Sync)
       try {
-        const reports = await getReports();
+        const [reports, settings] = await Promise.all([
+            getReports(),
+            getSettings()
+        ]);
         
-        // Find last relapse
+        setUserSettings(settings);
+        
+        // Priority: 
+        // 1. Last Relapse Date + 1 (Automatic)
+        // 2. Saved Start Date (Manual Setting)
+        // 3. Today (Default)
+        
         const sortedReports = [...reports].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         const lastRelapse = sortedReports.find(r => r.didDrink);
         
@@ -79,7 +89,11 @@ const App: React.FC = () => {
             const relapseDate = new Date(lastRelapse.date);
             relapseDate.setDate(relapseDate.getDate() + 1);
             setStartDate(relapseDate.toISOString().split('T')[0]);
+        } else {
+            // No relapses found? Use the saved start date
+            setStartDate(settings.startDate);
         }
+
       } catch (e) {
         console.error("Failed to load initial data", e);
       } finally {
@@ -146,6 +160,15 @@ const App: React.FC = () => {
   }
 
   // --- Handlers ---
+  const handleStartDateChange = async (newDate: string) => {
+      setStartDate(newDate);
+      if (userSettings) {
+          const newSettings = { ...userSettings, startDate: newDate };
+          setUserSettings(newSettings);
+          await saveSettings(newSettings);
+      }
+  };
+
   const toggleTrigger = (id: string) => {
     triggerHaptic('light');
     setSelectedTriggers(prev => 
@@ -209,7 +232,15 @@ const App: React.FC = () => {
     if (status === 'relapse') {
         const nextDay = new Date();
         nextDay.setDate(nextDay.getDate() + 1);
-        setStartDate(nextDay.toISOString().split('T')[0]);
+        const nextDayStr = nextDay.toISOString().split('T')[0];
+        
+        setStartDate(nextDayStr);
+        // Also update settings to reflect this new reality
+        if (userSettings) {
+            const newSettings = { ...userSettings, startDate: nextDayStr };
+            setUserSettings(newSettings);
+            await saveSettings(newSettings);
+        }
     }
 
     setIsSubmitting(false);
@@ -308,7 +339,7 @@ const App: React.FC = () => {
                           <input 
                               type="date"
                               value={startDate}
-                              onChange={(e) => setStartDate(e.target.value)}
+                              onChange={(e) => handleStartDateChange(e.target.value)}
                               className="w-full bg-white/10 text-white text-sm rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 border border-white/10"
                           />
                       </div>
