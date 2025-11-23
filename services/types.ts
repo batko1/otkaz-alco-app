@@ -19,6 +19,7 @@ export interface DailyReport {
 export interface UserSettings {
   costPerDay: number; // Average money spent on alcohol per day
   currency: string;   // 'RUB', 'USD', 'EUR', etc.
+  startDate: string;  // Format: YYYY-MM-DD
 }
 
 export interface TriggerStat {
